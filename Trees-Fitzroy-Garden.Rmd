@@ -1,0 +1,104 @@
+---
+title: "R programming"
+Author: Ricardo Arias
+output: Shiny Graph
+---
+
+## Libraries required
+First before we develop the Shiny Graph we import the libraries that would help us to do it. 
+  - shiny: Allows us to build interactive plots
+  - dplyr: Handle databases
+  - ggplot2: Plot information
+  - leaflet: Plot maps
+```{r}
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+```
+
+
+## Code
+```{r}
+#### R programming excersice
+
+ui <- fluidPage(
+  
+  titlePanel("Common Trees around Fitzroy Garden"),
+  
+  fluidRow( # First Row
+  column(width = 4, # First column of the first Row
+         
+         fluidRow(h2("The Top 5 Trees"), "In Fitzroy Garden the top 5 trees are: Ulmus, Platanus, Quercus, Corymbia and Ficus. Even though the Ulmus is the most popular by far, as there are almost 4 times more than the second most popular trees that is the Platanus"),
+         
+         fluidRow(plotOutput("V1"))),
+  
+  column(width = 8, # Second column of the first Row
+         fluidRow(selectInput("seltree", "Select a Tree:",
+                c("Ulmus" = "Ulmus",
+                  "Platanus" = "Platanus",
+                  "Quercus" = "Quercus",
+                  "Corymbia" = "Corymbia",
+                  "Ficus" = "Ficus"), multiple = TRUE,
+                selected = c("Ulmus","Platanus","Quercus","Corymbia", "Ficus"))),
+         
+        fluidRow(leafletOutput("map")))),
+  
+  fluidRow(  # Second Row
+    column(width = 4, fluidRow(h3("Life Expectancy"), "Corymbias and Quercus are the trees with more Life Expectancy of the top 5 most common trees in Fitzroy Garden, those trees can live up to 60 years and even more. Meanwhile, Ulmus and Platanus are the trees with the least life expectancy of the top 5 most common trees in Fitzroy Garden, living no more than 15 years. Finally, Ficus could have either a long or short Life Expectancy something that needs to be more investigated")), # First column of the Second Row
+    
+    column(width = 8, fluidRow(plotOutput("V2")))) # Second column of the Second Row
+  )
+
+
+server <- function(input, output, session) {
+  trees <- read.csv(file='./data/trees.csv')
+  top_5_trees <- (trees %>% count(Genus, sort=TRUE))[1:5,]
+  life_exp_top5 <- filter(trees, Genus %in% top_5_trees$Genus)[,c("Genus", "Useful.Life.Expectancy.Value")] 
+  
+  output$V1<-renderPlot({ggplot(data=top_5_trees, aes(x=reorder(Genus, -n), y=n, fill=Genus))+
+      geom_bar(stat="identity", position=position_dodge()) + 
+      geom_text(aes(label=n), vjust=1.6, color="white",position = position_dodge(0.9), size=5)+
+      scale_fill_brewer(palette="Dark2") + ggtitle("Top 5 Tress in Fitzroy Garden")+ xlab("Genus") +
+      ylab("Count") + theme(legend.position = "none")})
+  
+    
+  output$V2<-renderPlot({ggplot(data=life_exp_top5, aes(x=Useful.Life.Expectancy.Value, group=Genus, fill=Genus)) + scale_fill_brewer(palette="Dark2") +
+    geom_density(adjust=1.5) +
+    facet_wrap(~Genus) + scale_fill_brewer(palette="Dark2") +
+    theme(
+      legend.position="none",
+      panel.spacing = unit(0.1, "lines"),
+      axis.ticks.x=element_blank()
+    )})
+  
+  color <- colorFactor(palette=c("#66A61E", "#7570B3", "#E7298A", "#1B9E77", "#D95F02"), levels = c("Ulmus", "Platanus", "Quercus", "Corymbia", "Ficus"))
+  
+    output$map <- renderLeaflet({
+        leaflet(trees[trees$Genus == input$seltree,]) %>%
+        setView(lng = 144.980380, lat = -37.81315, zoom = 16.45) %>%
+        addProviderTiles("CartoDB.Positron")  %>% 
+        addCircleMarkers(
+        lng=~Longitude, # Longitude coordinates
+        lat=~Latitude, # Latitude coordinates
+        radius=~Diameter.Breast.Height/30, # Total count
+        stroke=FALSE, # Circle stroke
+        fillOpacity=0.5, # Circle Fill Opacity
+        color=~color(Genus) # Circle Color 
+      )
+    })
+    
+}
+
+shinyApp(ui, server)
+```
+
+
+## References
+https://groups.google.com/g/shiny-discuss/c/PVK3lfJjyvk
+https://stackoverflow.com/questions/24175997/force-no-default-selection-in-selectinput
+https://mastering-shiny.org/basic-reactivity.html
+https://stackoverflow.com/questions/43244069/using-dplyr-filter-in-a-shiny-app
+https://campus.datacamp.com/courses/interactive-maps-with-leaflet-in-r/plotting-points?ex=15
+https://api.rpubs.com/insight/leaflet
+https://shiny.rstudio.com/articles/layout-guide.html
